@@ -1,16 +1,20 @@
 library(haven)
 library(dplyr)
 library(naniar)
+library(FactoMineR)
+library(yacca)
+
+set.seed(1643)
 
 #Uses 2005-2006 NHANES Survey Data
 #Albumin & Creatinine - Urine
 ALB_CR_D <- read_xpt("C:/Users/Paolo/Desktop/Personal Research/lead_kidneys/nhanes_data/ALB_CR_D.xpt")
 #Alcohol Use
-ALQ_D <- read_xpt("C:/Users/Paolo/Desktop/Personal Research/lead_kidneys/nhanes_data/ALQ_D.xpt")
+#ALQ_D <- read_xpt("C:/Users/Paolo/Desktop/Personal Research/lead_kidneys/nhanes_data/ALQ_D.xpt")
 #Body Measures
 BMX_D <- read_xpt("C:/Users/Paolo/Desktop/Personal Research/lead_kidneys/nhanes_data/BMX_D.xpt")
 #Blood Pressure
-BPX_D <- read_xpt("C:/Users/Paolo/Desktop/Personal Research/lead_kidneys/nhanes_data/BPX_D.xpt")
+#BPX_D <- read_xpt("C:/Users/Paolo/Desktop/Personal Research/lead_kidneys/nhanes_data/BPX_D.xpt")
 #C-Reactive Protein (CRP)
 CRP_D <- read_xpt("C:/Users/Paolo/Desktop/Personal Research/lead_kidneys/nhanes_data/CRP_D.xpt")
 #Demographic Data
@@ -22,18 +26,19 @@ DPQ_D <- read_xpt("C:/Users/Paolo/Desktop/Personal Research/lead_kidneys/nhanes_
 #Current Health Status
 HSQ_D <- read_xpt("C:/Users/Paolo/Desktop/Personal Research/lead_kidneys/nhanes_data/HSQ_D.xpt")
 #Kidney Conditions - Urology	
-KIQ_U_D <- read_xpt("C:/Users/Paolo/Desktop/Personal Research/lead_kidneys/nhanes_data/KIQ_U_D.xpt")
+#KIQ_U_D <- read_xpt("C:/Users/Paolo/Desktop/Personal Research/lead_kidneys/nhanes_data/KIQ_U_D.xpt")
 #Medical Conditions	
 MCQ_D <- read_xpt("C:/Users/Paolo/Desktop/Personal Research/lead_kidneys/nhanes_data/MCQ_D.xpt")
 #Physical Activity Monitor	
-paxraw_d <- read_xpt("C:/Users/Paolo/Desktop/Personal Research/lead_kidneys/nhanes_data/paxraw_d.xpt")
+#paxraw_d <- read_xpt("C:/Users/Paolo/Desktop/Personal Research/lead_kidneys/nhanes_data/paxraw_d.xpt")
 #Cadmium, Lead, & Total Mercury - Blood	
 PBCD_D <- read_xpt("C:/Users/Paolo/Desktop/Personal Research/lead_kidneys/nhanes_data/PBCD_D.xpt")
 #Smoking - Recent Tobacco Use	
 SMQRTU_D <- read_xpt("C:/Users/Paolo/Desktop/Personal Research/lead_kidneys/nhanes_data/SMQRTU_D.xpt")
 #Weight History
-WHQ_D <- read_xpt("C:/Users/Paolo/Desktop/Personal Research/lead_kidneys/nhanes_data/WHQ_D.xpt")
+#WHQ_D <- read_xpt("C:/Users/Paolo/Desktop/Personal Research/lead_kidneys/nhanes_data/WHQ_D.xpt")
 
+#assemble dataframe
 Df1 <- ALB_CR_D[, c("SEQN", "URXUMA", "URXUCR")]
 Df2 <- BMX_D[, c("SEQN", "BMXBMI", "BMXWAIST")]
 Df3 <- CRP_D[, c("SEQN", "LBXCRP")]
@@ -57,14 +62,17 @@ cohort <-
   full_join(Df9, by = "SEQN") %>% 
   full_join(Df10, by = "SEQN")
 
+#rename for interpretability
 sapply(cohort, attributes)
 names(cohort) <- c("id", "albumin_urine", "creatinine_urine", "bmi", "waist_circ", 
                    "c-reactive_prot", "age_at_screen", "gender", "race", "family_pir", 
                    "education_lev", "masked_var_psuedo_strat", "diabetes", "prediabetes",
                    "depression", "gen_health", "cancer", "lead", "tobacco")
 
-naniar::vis_miss(cohort)
-naniar::miss_var_summary(cohort)
+#initial missingness check
+vis_miss(cohort)
+miss_var_summary(cohort)
+mcar_test(cohort)
 
 cohort[, c("id", "gender", "race", "education_lev", "masked_var_psuedo_strat", 
            "diabetes", "prediabetes", "depression", "gen_health", 
@@ -73,6 +81,7 @@ cohort[, c("id", "gender", "race", "education_lev", "masked_var_psuedo_strat",
                     "masked_var_psuedo_strat", "diabetes", "prediabetes", 
                     "depression", "gen_health", "cancer", "tobacco")], as.factor)
 
+#recoding vars
 cohort$gender <- as.factor(ifelse(cohort$gender == 1, "Male", "Female"))
 race_labels <- c(
   "1" = "Mexican_American",
@@ -114,9 +123,13 @@ tobacco_labels <- c(
 )
 cohort$tobacco <- as.factor(tobacco_labels[as.character(cohort$tobacco)])
 
-cohort$diabetes
-cohort$prediabetes
-cohort$depression
-cohort$gen_health
-cohort$cancer
-cohort$tobacco
+#exploratory analysis
+summary(cohort)
+cohort_complete <- na.exclude(cohort)
+cohort_mca <- MCA(cohort[, c("gender", "race", "education_lev", 
+                             "diabetes", "depression", "gen_health", 
+                             "cancer", "tobacco")])
+cohort_cc <- cca(as.matrix(cohort_complete[, c("albumin_urine", "creatinine_urine")]), 
+                        as.matrix(cohort_complete[, c("bmi", "waist_circ", "c-reactive_prot", "age_at_screen",
+                                   "family_pir")]))
+helio.plot(cohort_cc) 
