@@ -1,5 +1,5 @@
 Aim:
-Analysis on public access NHANES data to determine if there is evidence that elevated lead exposure may significantly contribute to renal disfunction and death.
+Analysis on public access NHANES data to determine if there is evidence that elevated lead exposure may significantly contribute to renal disfunction and in the long term, death.
 
 Methods:
 TBD
