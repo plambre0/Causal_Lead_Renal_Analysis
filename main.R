@@ -211,20 +211,20 @@ hist(prelim_imp$family_pir, breaks = 100)
 hist(prelim_imp$egfr, breaks = 100)
 
 #Multiple Correspondence Analysis
-cohort_mca <- MCA(cohort[, c("gender", "race", "education_lev", "diabetes", 
-                             "depression", "gen_health", "cancer", "tobacco", 
-                             "dead_2019")])
+cohort_mca <- MCA(prelim_imp[, c("gender", "race", "education_lev", "diabetes", 
+                                 "depression", "gen_health", "cancer", "tobacco", 
+                                 "dead_2019")])
 
 #Canonical Correlation Analysis
-cohort_cc <- cca(as.matrix(cohort_complete[, c("albumin_urine", 
-                                               "creatinine_urine", 
-                                               "egfr", 
-                                               "c-reactive_prot")]), 
-                        as.matrix(cohort_complete[, c("bmi", 
-                                                      "waist_circ", 
-                                                      "age_at_screen",
-                                                      "family_pir")]))
+cohort_cc <- cca(as.matrix(prelim_imp[, c("albumin_urine", 
+                                          "creatinine_urine", 
+                                          "egfr", 
+                                          "c-reactive_prot")]), 
+                        as.matrix(prelim_imp[, c("bmi", 
+                                                 "waist_circ", 
+                                                 "age_at_screen", 
+                                                 "family_pir")]))
 helio.plot(cohort_cc, lab.cex = .8, name.cex = .9, 
            x.name = "Biomarkers", 
            y.name = "Physical and Demographic \n Measurements", 
-           main = "Biomarkers Vs. Physical and Demographic Measurements")    
+           main = "Biomarkers Vs. Physical and Demographic Measurements") 
