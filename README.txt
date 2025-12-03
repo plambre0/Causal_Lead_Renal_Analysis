@@ -1,8 +1,10 @@
 Aim:
-Analysis on public access NHANES data to determine if there is evidence that elevated lead exposure may significantly contribute to renal disfunction and in the long term, death, while controlling for known factors.
+  Analysis on public access NHANES data to determine if there is evidence that elevated lead exposure may significantly contribute to renal disfunction and in the long term, death, while controlling for known factors.
 
 Methods:
-TBD
+***In Progress
+  The 2005-2006 NHANES was chosen due to the fact that it took place before the EPA's 2008 Renovation, Repair, and Painting (RRP) Rule while having measurements for lead blood levels, measures of kidney function, and necessary covariates. The data was collected from the CDC's website on 12/1/2025 and was compiled into a dataframe containing per participant records with variables including demographics, disease statuses, physical characteristics, and lab results.
+  Special attention was paid to missing data and non-response answers. The missingness mechanism initially appeared to be non-random with characteristic block-missingness. This was quantatatively confirmed with a Little's MCAR Test which yielded a p-value of 0, which confirmed that there is realistically not chance that the mechanism is MCAR. To account for the proportion of participants who refused to answer or did not know the answer to survey questions, multiple corrospondance analysis and canonical correlation analysis were used to assess evidence for patterns among those participants as part of the process of deciding how to treat those responses.
 
 Data Source:
 United States. Centers for Disease Control and Prevention, National Center for Health Statistics. (2012). National Health and Nutrition Examination Survey (NHANES), 2005-2006. ICPSR [distributor], 2012-02-22. https://doi.org/10.3886/ICPSR25504.v5.
