@@ -1,4 +1,5 @@
 library(haven)
+library(readr)
 library(dplyr)
 library(naniar)
 library(FactoMineR)
@@ -6,9 +7,10 @@ library(yacca)
 
 set.seed(1643)
 
-#Uses 2005-2006 NHANES Survey Data
+#Uses 2005-2006 NHANES Survey Data and 2019 Mortality Data
 #Albumin & Creatinine - Urine
 ALB_CR_D <- read_xpt("C:/Users/Paolo/Desktop/Personal Research/lead_kidneys/nhanes_data/ALB_CR_D.xpt")
+BIOPRO_D <- read_xpt("C:/Users/Paolo/Desktop/Personal Research/lead_kidneys/nhanes_data/BIOPRO_D.xpt")
 #Alcohol Use
 #ALQ_D <- read_xpt("C:/Users/Paolo/Desktop/Personal Research/lead_kidneys/nhanes_data/ALQ_D.xpt")
 #Body Measures
@@ -37,8 +39,28 @@ PBCD_D <- read_xpt("C:/Users/Paolo/Desktop/Personal Research/lead_kidneys/nhanes
 SMQRTU_D <- read_xpt("C:/Users/Paolo/Desktop/Personal Research/lead_kidneys/nhanes_data/SMQRTU_D.xpt")
 #Weight History
 #WHQ_D <- read_xpt("C:/Users/Paolo/Desktop/Personal Research/lead_kidneys/nhanes_data/WHQ_D.xpt")
+#Mortality Data 2019
+MORT <- read_fwf("C:/Users/Paolo/Desktop/Personal Research/lead_kidneys/nhanes_data/NHANES_2005_2006_MORT_2019_PUBLIC.dat",
+                 col_types = "ciiiiiiidd",
+                 fwf_cols(publicid = c(1,14),
+                          eligstat = c(15,15),
+                          mortstat = c(16,16),
+                          ucod_leading = c(17,19),
+                          diabetes = c(20,20),
+                          hyperten = c(21,21),
+                          dodqtr = c(22,22),
+                          dodyear = c(23,26),
+                          wgt_new = c(27,34),
+                          sa_wgt_new = c(35,42)
+                 ),
+                 na = c("", ".")
+)
+names(MORT)[names(MORT) == "publicid"] <- "SEQN"
+MORT$SEQN <- as.double(MORT$SEQN)
+
 
 #assemble dataframe
+DF0 <- BIOPRO_D[, c("SEQN", "LBXSCR")]
 Df1 <- ALB_CR_D[, c("SEQN", "URXUMA", "URXUCR")]
 Df2 <- BMX_D[, c("SEQN", "BMXBMI", "BMXWAIST")]
 Df3 <- CRP_D[, c("SEQN", "LBXCRP")]
@@ -49,9 +71,11 @@ Df7 <- HSQ_D[, c("SEQN", "HSD010")]
 Df8 <- MCQ_D[, c("SEQN", "MCQ220")]
 Df9 <- PBCD_D[, c("SEQN", "LBXBPB")]
 Df10 <- SMQRTU_D[, c("SEQN", "SMQ680")]
+Df11 <- MORT[, c("SEQN", "mortstat")]
 
 cohort <-
-  Df1 %>% 
+  DF0 %>% 
+  full_join(Df1, by = "SEQN") %>% 
   full_join(Df2, by = "SEQN") %>% 
   full_join(Df3, by = "SEQN") %>% 
   full_join(Df4, by = "SEQN") %>% 
@@ -60,14 +84,17 @@ cohort <-
   full_join(Df7, by = "SEQN") %>% 
   full_join(Df8, by = "SEQN") %>% 
   full_join(Df9, by = "SEQN") %>% 
-  full_join(Df10, by = "SEQN")
+  full_join(Df10, by = "SEQN") %>%
+  full_join(Df11, by = "SEQN")
 
 #rename for interpretability
 sapply(cohort, attributes)
-names(cohort) <- c("id", "albumin_urine", "creatinine_urine", "bmi", "waist_circ", 
-                   "c-reactive_prot", "age_at_screen", "gender", "race", "family_pir", 
-                   "education_lev", "masked_var_psuedo_strat", "diabetes", "prediabetes",
-                   "depression", "gen_health", "cancer", "lead", "tobacco")
+names(cohort) <- c("id", "creatinine_serum", "albumin_urine", "creatinine_urine", 
+                   "bmi", "waist_circ", "c-reactive_prot", "age_at_screen", 
+                   "gender", "race", "family_pir", "education_lev", 
+                   "masked_var_psuedo_strat", "diabetes", "prediabetes",
+                   "depression", "gen_health", "cancer", "lead", "tobacco", 
+                   "dead_2019")
 
 #initial missingness check
 vis_miss(cohort)
@@ -76,10 +103,11 @@ mcar_test(cohort)
 
 cohort[, c("id", "gender", "race", "education_lev", "masked_var_psuedo_strat", 
            "diabetes", "prediabetes", "depression", "gen_health", 
-           "cancer", "tobacco")] <- 
+           "cancer", "tobacco", "dead_2019")] <- 
   lapply(cohort[, c("id", "gender", "race", "education_lev", 
                     "masked_var_psuedo_strat", "diabetes", "prediabetes", 
-                    "depression", "gen_health", "cancer", "tobacco")], as.factor)
+                    "depression", "gen_health", "cancer", "tobacco", "dead_2019")], 
+         as.factor)
 
 #recoding vars
 cohort$gender <- as.factor(ifelse(cohort$gender == 1, "Male", "Female"))
@@ -123,13 +151,25 @@ tobacco_labels <- c(
 )
 cohort$tobacco <- as.factor(tobacco_labels[as.character(cohort$tobacco)])
 
+cohort <- cohort %>%
+  mutate(
+    egfr = case_when(
+      gender == "Female" & creatinine_serum <= 0.7 ~ 144 * (creatinine_serum / 0.7)^(-0.329) * (0.993^age_at_screen) * ifelse(race == "Non_Hispanic_Black", 1.159, 1),
+      gender == "Female" & creatinine_serum > 0.7 ~ 144 * (creatinine_serum / 0.7)^(-1.209) * (0.993^age_at_screen) * ifelse(race == "Non_Hispanic_Black", 1.159, 1),
+      gender == "Male" & creatinine_serum <= 0.9 ~ 141 * (creatinine_serum / 0.9)^(-0.411) * (0.993^age_at_screen) * ifelse(race == "Non_Hispanic_Black", 1.159, 1),
+      gender == "Male" & creatinine_serum > 0.9 ~ 141 * (creatinine_serum / 0.9)^(-1.209) * (0.993^age_at_screen) * ifelse(race == "Non_Hispanic_Black", 1.159, 1),
+      TRUE ~ NA_real_
+    )
+  )
+
+
 #exploratory analysis
 summary(cohort)
 cohort_complete <- na.exclude(cohort)
 cohort_mca <- MCA(cohort[, c("gender", "race", "education_lev", 
                              "diabetes", "depression", "gen_health", 
-                             "cancer", "tobacco")])
-cohort_cc <- cca(as.matrix(cohort_complete[, c("albumin_urine", "creatinine_urine")]), 
+                             "cancer", "tobacco", "dead_2019")])
+cohort_cc <- cca(as.matrix(cohort_complete[, c("albumin_urine", "creatinine_urine", "egfr")]), 
                         as.matrix(cohort_complete[, c("bmi", "waist_circ", "c-reactive_prot", "age_at_screen",
                                    "family_pir")]))
-helio.plot(cohort_cc) 
+helio.plot(cohort_cc)    
