@@ -1,11 +1,21 @@
+library(dagitty)
+library(ggdag)
 library(haven)
 library(readr)
 library(dplyr)
+library(ggplot2)
 library(naniar)
+library(mice)
 library(FactoMineR)
 library(yacca)
 
 set.seed(1643)
+
+#specify DAG for Causal Hypothesis
+#Lead Exposure -> Renal Damage -> Death
+dag <- dagitty("dag{Lead_Exposure -> Renal_Damage -> Death}")
+tidy_dagitty(dag)
+ggdag(dag, node = FALSE, text_col = "black", text_size = 3) + theme_dag_blank()
 
 #Uses 2005-2006 NHANES Survey Data and 2019 Mortality Data
 #Albumin & Creatinine - Urine
@@ -151,7 +161,23 @@ tobacco_labels <- c(
 )
 cohort$tobacco <- as.factor(tobacco_labels[as.character(cohort$tobacco)])
 
+cohort_imp_quickpred <- quickpred(cohort, mincor = .2)
+cohort_prelim_imp <- mice(cohort[, !(names(cohort) %in% c("id"))], m = 1, maxit = 100)
+plot(cohort_prelim_imp)
+prelim_imp <- complete(cohort_prelim_imp)
+
+#compute egfr
 cohort <- cohort %>%
+  mutate(
+    egfr = case_when(
+      gender == "Female" & creatinine_serum <= 0.7 ~ 144 * (creatinine_serum / 0.7)^(-0.329) * (0.993^age_at_screen) * ifelse(race == "Non_Hispanic_Black", 1.159, 1),
+      gender == "Female" & creatinine_serum > 0.7 ~ 144 * (creatinine_serum / 0.7)^(-1.209) * (0.993^age_at_screen) * ifelse(race == "Non_Hispanic_Black", 1.159, 1),
+      gender == "Male" & creatinine_serum <= 0.9 ~ 141 * (creatinine_serum / 0.9)^(-0.411) * (0.993^age_at_screen) * ifelse(race == "Non_Hispanic_Black", 1.159, 1),
+      gender == "Male" & creatinine_serum > 0.9 ~ 141 * (creatinine_serum / 0.9)^(-1.209) * (0.993^age_at_screen) * ifelse(race == "Non_Hispanic_Black", 1.159, 1),
+      TRUE ~ NA_real_
+    )
+  )
+prelim_imp <- prelim_imp %>%
   mutate(
     egfr = case_when(
       gender == "Female" & creatinine_serum <= 0.7 ~ 144 * (creatinine_serum / 0.7)^(-0.329) * (0.993^age_at_screen) * ifelse(race == "Non_Hispanic_Black", 1.159, 1),
@@ -165,11 +191,40 @@ cohort <- cohort %>%
 
 #exploratory analysis
 summary(cohort)
-cohort_complete <- na.exclude(cohort)
-cohort_mca <- MCA(cohort[, c("gender", "race", "education_lev", 
-                             "diabetes", "depression", "gen_health", 
-                             "cancer", "tobacco", "dead_2019")])
-cohort_cc <- cca(as.matrix(cohort_complete[, c("albumin_urine", "creatinine_urine", "egfr")]), 
-                        as.matrix(cohort_complete[, c("bmi", "waist_circ", "c-reactive_prot", "age_at_screen",
-                                   "family_pir")]))
-helio.plot(cohort_cc)    
+
+hist(cohort$creatinine_serum, breaks = 100)
+hist(cohort$albumin_urine, breaks = 100)
+hist(cohort$creatinine_urine, breaks = 100)
+hist(cohort$waist_circ, breaks = 100)
+hist(cohort$`c-reactive_prot`, breaks = 100)
+hist(cohort$age_at_screen, breaks = 100)
+hist(cohort$family_pir, breaks = 100)
+hist(cohort$egfr, breaks = 100)
+
+hist(prelim_imp$creatinine_serum, breaks = 100)
+hist(prelim_imp$albumin_urine, breaks = 100)
+hist(prelim_imp$creatinine_urine, breaks = 100)
+hist(prelim_imp$waist_circ, breaks = 100)
+hist(prelim_imp$`c-reactive_prot`, breaks = 100)
+hist(prelim_imp$age_at_screen, breaks = 100)
+hist(prelim_imp$family_pir, breaks = 100)
+hist(prelim_imp$egfr, breaks = 100)
+
+#Multiple Correspondence Analysis
+cohort_mca <- MCA(cohort[, c("gender", "race", "education_lev", "diabetes", 
+                             "depression", "gen_health", "cancer", "tobacco", 
+                             "dead_2019")])
+
+#Canonical Correlation Analysis
+cohort_cc <- cca(as.matrix(cohort_complete[, c("albumin_urine", 
+                                               "creatinine_urine", 
+                                               "egfr", 
+                                               "c-reactive_prot")]), 
+                        as.matrix(cohort_complete[, c("bmi", 
+                                                      "waist_circ", 
+                                                      "age_at_screen",
+                                                      "family_pir")]))
+helio.plot(cohort_cc, lab.cex = .8, name.cex = .9, 
+           x.name = "Biomarkers", 
+           y.name = "Physical and Demographic \n Measurements", 
+           main = "Biomarkers Vs. Physical and Demographic Measurements")    
