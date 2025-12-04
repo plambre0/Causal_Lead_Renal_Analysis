@@ -3,6 +3,7 @@ library(ggdag)
 library(haven)
 library(readr)
 library(dplyr)
+library(vcd)
 library(ggplot2)
 library(naniar)
 library(mice)
@@ -105,6 +106,8 @@ names(cohort) <- c("id", "creatinine_serum", "albumin_urine", "creatinine_urine"
                    "masked_var_psuedo_strat", "diabetes", "prediabetes",
                    "depression", "gen_health", "cancer", "lead", "tobacco", 
                    "dead_2019")
+#drop participants younger than 20
+cohort <- cohort[cohort$age_at_screen >= 20,]
 
 #initial missingness check
 vis_miss(cohort)
@@ -161,11 +164,6 @@ tobacco_labels <- c(
 )
 cohort$tobacco <- as.factor(tobacco_labels[as.character(cohort$tobacco)])
 
-cohort_imp_quickpred <- quickpred(cohort, mincor = .2)
-cohort_prelim_imp <- mice(cohort[, !(names(cohort) %in% c("id"))], m = 1, maxit = 100)
-plot(cohort_prelim_imp)
-prelim_imp <- complete(cohort_prelim_imp)
-
 #compute egfr
 cohort <- cohort %>%
   mutate(
@@ -177,17 +175,14 @@ cohort <- cohort %>%
       TRUE ~ NA_real_
     )
   )
-prelim_imp <- prelim_imp %>%
-  mutate(
-    egfr = case_when(
-      gender == "Female" & creatinine_serum <= 0.7 ~ 144 * (creatinine_serum / 0.7)^(-0.329) * (0.993^age_at_screen) * ifelse(race == "Non_Hispanic_Black", 1.159, 1),
-      gender == "Female" & creatinine_serum > 0.7 ~ 144 * (creatinine_serum / 0.7)^(-1.209) * (0.993^age_at_screen) * ifelse(race == "Non_Hispanic_Black", 1.159, 1),
-      gender == "Male" & creatinine_serum <= 0.9 ~ 141 * (creatinine_serum / 0.9)^(-0.411) * (0.993^age_at_screen) * ifelse(race == "Non_Hispanic_Black", 1.159, 1),
-      gender == "Male" & creatinine_serum > 0.9 ~ 141 * (creatinine_serum / 0.9)^(-1.209) * (0.993^age_at_screen) * ifelse(race == "Non_Hispanic_Black", 1.159, 1),
-      TRUE ~ NA_real_
-    )
-  )
+#code lead poisoning
+cohort$lead_poisoning <- as.factor(ifelse(cohort$lead>3.5, 1, 0))
+cohort$renal_damage <- as.factor(ifelse(cohort$egfr<60, 1, 0))
 
+#use first MICE imputation for exploratory analysis
+cohort_imp_quickpred <- quickpred(cohort, mincor = .2)
+cohort_prelim_imp <- mice(cohort[, !(names(cohort) %in% c("id"))], m = 1)
+prelim_imp <- complete(cohort_prelim_imp)
 
 #exploratory analysis
 summary(cohort)
@@ -209,6 +204,16 @@ hist(prelim_imp$`c-reactive_prot`, breaks = 100)
 hist(prelim_imp$age_at_screen, breaks = 100)
 hist(prelim_imp$family_pir, breaks = 100)
 hist(prelim_imp$egfr, breaks = 100)
+
+#preliminary chi-square tests
+vcd::mosaic(renal_damage ~ lead_poisoning, data = prelim_imp)
+chisq.test(table(prelim_imp$renal_damage, prelim_imp$lead_poisoning))
+
+vcd::mosaic(dead_2019 ~ renal_damage, data = prelim_imp)
+chisq.test(table(prelim_imp$dead_2019, prelim_imp$renal_damage))
+
+vcd::mosaic(dead_2019 ~ lead_poisoning, data = prelim_imp)
+chisq.test(table(prelim_imp$dead_2019, prelim_imp$lead_poisoning))
 
 #Multiple Correspondence Analysis
 cohort_mca <- MCA(prelim_imp[, c("gender", "race", "education_lev", "diabetes", 
