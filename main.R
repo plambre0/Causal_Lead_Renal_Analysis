@@ -83,7 +83,7 @@ Df7 <- HSQ_D[, c("SEQN", "HSD010")]
 Df8 <- MCQ_D[, c("SEQN", "MCQ220")]
 Df9 <- PBCD_D[, c("SEQN", "LBXBPB")]
 Df10 <- SMQRTU_D[, c("SEQN", "SMQ680")]
-Df11 <- MORT[, c("SEQN", "mortstat")]
+Df11 <- MORT[, c("SEQN", "mortstat", "ucod_leading")]
 
 cohort <-
   DF0 %>% 
@@ -106,7 +106,10 @@ names(cohort) <- c("id", "creatinine_serum", "albumin_urine", "creatinine_urine"
                    "gender", "race", "family_pir", "education_lev", 
                    "exam_weight", "psu", "masked_var_psuedo_strat", "diabetes", 
                    "prediabetes", "depression", "gen_health", "cancer", "lead", 
-                   "tobacco", "dead_2019")
+                   "tobacco", "dead_2019", "death_cause")
+cohort$death_cause <- ifelse(is.na(cohort$death_cause), 0, cohort$death_cause)
+cohort$death_renal <- ifelse(cohort$death_cause == 9, 1, 0)
+
 #drop participants younger than 20
 cohort <- cohort[cohort$age_at_screen >= 20,]
 
@@ -117,10 +120,11 @@ mcar_test(cohort)
 
 cohort[, c("id", "gender", "race", "education_lev", "psu", "masked_var_psuedo_strat", 
            "diabetes", "prediabetes", "depression", "gen_health", 
-           "cancer", "tobacco", "dead_2019")] <- 
+           "cancer", "tobacco", "dead_2019", "death_cause", "death_renal")] <- 
   lapply(cohort[, c("id", "gender", "race", "education_lev", "psu", 
                     "masked_var_psuedo_strat", "diabetes", "prediabetes", 
-                    "depression", "gen_health", "cancer", "tobacco", "dead_2019")], 
+                    "depression", "gen_health", "cancer", "tobacco", "dead_2019",
+                    "death_cause", "death_renal")], 
          as.factor)
 
 #recoding vars
@@ -169,20 +173,35 @@ cohort$tobacco <- as.factor(tobacco_labels[as.character(cohort$tobacco)])
 cohort <- cohort %>%
   mutate(
     egfr = case_when(
-      gender == "Female" & creatinine_serum <= 0.7 ~ 144 * (creatinine_serum / 0.7)^(-0.329) * (0.993^age_at_screen) * ifelse(race == "Non_Hispanic_Black", 1.159, 1),
-      gender == "Female" & creatinine_serum > 0.7 ~ 144 * (creatinine_serum / 0.7)^(-1.209) * (0.993^age_at_screen) * ifelse(race == "Non_Hispanic_Black", 1.159, 1),
-      gender == "Male" & creatinine_serum <= 0.9 ~ 141 * (creatinine_serum / 0.9)^(-0.411) * (0.993^age_at_screen) * ifelse(race == "Non_Hispanic_Black", 1.159, 1),
-      gender == "Male" & creatinine_serum > 0.9 ~ 141 * (creatinine_serum / 0.9)^(-1.209) * (0.993^age_at_screen) * ifelse(race == "Non_Hispanic_Black", 1.159, 1),
+      gender == "Female" & creatinine_serum <= 0.7 ~ 144 * 
+        (creatinine_serum / 0.7) ^ (-0.329) * 
+        (0.993 ^ age_at_screen) * ifelse(race == "Non_Hispanic_Black", 1.159, 1),
+      gender == "Female" & creatinine_serum > 0.7 ~ 144 * 
+        (creatinine_serum / 0.7) ^ (-1.209) * 
+        (0.993^age_at_screen) * ifelse(race == "Non_Hispanic_Black", 1.159, 1),
+      gender == "Male" & creatinine_serum <= 0.9 ~ 141 * 
+        (creatinine_serum / 0.9) ^ (-0.411) * (0.993 ^ age_at_screen) * 
+        ifelse(race == "Non_Hispanic_Black", 1.159, 1),
+      gender == "Male" & creatinine_serum > 0.9 ~ 141 * 
+        (creatinine_serum / 0.9) ^ (-1.209) * (0.993 ^ age_at_screen) * 
+        ifelse(race == "Non_Hispanic_Black", 1.159, 1),
       TRUE ~ NA_real_
     )
   )
+
 #code lead poisoning
-cohort$lead_poisoning <- as.factor(ifelse(cohort$lead>3.5, 1, 0))
-cohort$renal_damage <- as.factor(ifelse(cohort$egfr<60, 1, 0))
+cohort$lead_poisoning <- as.factor(ifelse(cohort$lead > 3.5, 1, 0))
+cohort$renal_damage <- as.factor(ifelse(cohort$egfr < 60, 1, 0))
 
 #use first MICE imputation for exploratory analysis
 cohort_imp_quickpred <- quickpred(cohort, mincor = .2)
-cohort_prelim_imp <- mice(cohort[, !(names(cohort) %in% c("id"))], m = 1)
+censor <- c(
+  "id", "dead_2019", "lead_poisoning", "egfr", "masked_var_psuedo_strat", 
+  "SDMVPSU", "SDMVSTRA", "WTMEC2YR", "WTINT2YR"
+)
+censor <- intersect(censor, colnames(cohort_imp_quickpred))
+cohort_imp_quickpred[, censor] <- 0
+cohort_prelim_imp <- mice(cohort, m = 1, pred = cohort_imp_quickpred)
 prelim_imp <- complete(cohort_prelim_imp)
 
 #exploratory analysis
@@ -234,3 +253,32 @@ helio.plot(cohort_cc, lab.cex = .8, name.cex = .9,
            x.name = "Biomarkers", 
            y.name = "Physical and Demographic \n Measurements", 
            main = "Biomarkers Vs. Physical and Demographic Measurements") 
+
+#prelim mediation analyses
+des <- svydesign(
+  id = ~ psu,
+  strata = ~ masked_var_psuedo_strat,
+  weights = ~ exam_weight,
+  nest = TRUE,
+  data = prelim_imp
+)
+
+#mediation analysis for death in general
+med_mod <- svyglm(egfr ~ lead + age_at_screen + gender + race + family_pir + bmi, design = des)
+out_mod <- svyglm(dead_2019 ~ lead + egfr + age_at_screen + gender + race + family_pir + bmi, family = quasibinomial(), design = des)
+med_mod_w <- lm(egfr ~ lead + age_at_screen + gender + race + family_pir + bmi,
+                data = prelim_imp)
+out_mod_w <- glm(dead_2019 ~ lead + egfr + age_at_screen + gender + race + family_pir + bmi,
+                 data = prelim_imp, family = binomial(link="logit"))
+med <- mediate(med_mod_w, out_mod_w, treat="lead", mediator="egfr", sims=1000)
+summary(med)
+
+#mediation analysis for death where leading cause was kidney related
+med_mod <- svyglm(egfr ~ lead + age_at_screen + gender + race + family_pir + bmi, design = des)
+out_mod <- svyglm(death_renal ~ lead + egfr + age_at_screen + gender + race + family_pir + bmi, family = quasibinomial(), design = des)
+med_mod_w <- lm(egfr ~ lead + age_at_screen + gender + race + family_pir + bmi,
+                data = prelim_imp)
+out_mod_w <- glm(death_renal ~ lead + egfr + age_at_screen + gender + race + family_pir + bmi,
+                 data = prelim_imp, family = binomial(link="logit"))
+med <- mediate(med_mod_w, out_mod_w, treat="lead", mediator="egfr", sims=1000)
+summary(med)
