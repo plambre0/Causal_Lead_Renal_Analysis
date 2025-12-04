@@ -9,6 +9,7 @@ library(naniar)
 library(mice)
 library(FactoMineR)
 library(yacca)
+library(ltmle)
 
 set.seed(1643)
 
@@ -75,7 +76,7 @@ DF0 <- BIOPRO_D[, c("SEQN", "LBXSCR")]
 Df1 <- ALB_CR_D[, c("SEQN", "URXUMA", "URXUCR")]
 Df2 <- BMX_D[, c("SEQN", "BMXBMI", "BMXWAIST")]
 Df3 <- CRP_D[, c("SEQN", "LBXCRP")]
-Df4 <- DEMO_D[, c("SEQN", "RIDAGEYR", "RIAGENDR", "RIDRETH1", "INDFMPIR", "DMDEDUC2", "SDMVSTRA")]
+Df4 <- DEMO_D[, c("SEQN", "RIDAGEYR", "RIAGENDR", "RIDRETH1", "INDFMPIR", "DMDEDUC2", "WTMEC2YR", "SDMVPSU", "SDMVSTRA")]
 Df5 <- DIQ_D[, c("SEQN", "DIQ010", "DIQ160")]
 Df6 <- DPQ_D[, c("SEQN", "DPQ020")]
 Df7 <- HSQ_D[, c("SEQN", "HSD010")]
@@ -103,9 +104,9 @@ sapply(cohort, attributes)
 names(cohort) <- c("id", "creatinine_serum", "albumin_urine", "creatinine_urine", 
                    "bmi", "waist_circ", "c-reactive_prot", "age_at_screen", 
                    "gender", "race", "family_pir", "education_lev", 
-                   "masked_var_psuedo_strat", "diabetes", "prediabetes",
-                   "depression", "gen_health", "cancer", "lead", "tobacco", 
-                   "dead_2019")
+                   "exam_weight", "psu", "masked_var_psuedo_strat", "diabetes", 
+                   "prediabetes", "depression", "gen_health", "cancer", "lead", 
+                   "tobacco", "dead_2019")
 #drop participants younger than 20
 cohort <- cohort[cohort$age_at_screen >= 20,]
 
@@ -114,10 +115,10 @@ vis_miss(cohort)
 miss_var_summary(cohort)
 mcar_test(cohort)
 
-cohort[, c("id", "gender", "race", "education_lev", "masked_var_psuedo_strat", 
+cohort[, c("id", "gender", "race", "education_lev", "psu", "masked_var_psuedo_strat", 
            "diabetes", "prediabetes", "depression", "gen_health", 
            "cancer", "tobacco", "dead_2019")] <- 
-  lapply(cohort[, c("id", "gender", "race", "education_lev", 
+  lapply(cohort[, c("id", "gender", "race", "education_lev", "psu", 
                     "masked_var_psuedo_strat", "diabetes", "prediabetes", 
                     "depression", "gen_health", "cancer", "tobacco", "dead_2019")], 
          as.factor)
