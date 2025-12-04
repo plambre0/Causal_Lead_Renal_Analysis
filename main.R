@@ -264,21 +264,13 @@ des <- svydesign(
 )
 
 #mediation analysis for death in general
-med_mod <- svyglm(egfr ~ lead + age_at_screen + gender + race + family_pir + bmi, design = des)
-out_mod <- svyglm(dead_2019 ~ lead + egfr + age_at_screen + gender + race + family_pir + bmi, family = quasibinomial(), design = des)
-med_mod_w <- lm(egfr ~ lead + age_at_screen + gender + race + family_pir + bmi,
-                data = prelim_imp)
-out_mod_w <- glm(dead_2019 ~ lead + egfr + age_at_screen + gender + race + family_pir + bmi,
-                 data = prelim_imp, family = binomial(link="logit"))
-med <- mediate(med_mod_w, out_mod_w, treat="lead", mediator="egfr", sims=1000)
-summary(med)
+med_mod_1 <- svyglm(egfr ~ lead + age_at_screen + gender + race + family_pir + bmi, design = des)
+out_mod_1 <- svyglm(dead_2019 ~ lead + egfr + age_at_screen + gender + race + family_pir + bmi, family = quasibinomial(), design = des)
+med_1 <- mediate(med_mod_1, out_mod_1, treat="lead", mediator="egfr", sims=1000)
+summary(med_1)
 
 #mediation analysis for death where leading cause was kidney related
-med_mod <- svyglm(egfr ~ lead + age_at_screen + gender + race + family_pir + bmi, design = des)
-out_mod <- svyglm(death_renal ~ lead + egfr + age_at_screen + gender + race + family_pir + bmi, family = quasibinomial(), design = des)
-med_mod_w <- lm(egfr ~ lead + age_at_screen + gender + race + family_pir + bmi,
-                data = prelim_imp)
-out_mod_w <- glm(death_renal ~ lead + egfr + age_at_screen + gender + race + family_pir + bmi,
-                 data = prelim_imp, family = binomial(link="logit"))
-med <- mediate(med_mod_w, out_mod_w, treat="lead", mediator="egfr", sims=1000)
-summary(med)
+med_mod_2 <- svyglm(egfr ~ lead + age_at_screen + gender + race + family_pir + bmi, design = des)
+out_mod_2 <- svyglm(death_renal ~ lead + egfr + age_at_screen + gender + race + family_pir + bmi, family = quasibinomial(), design = des)
+med_2 <- mediate(med_mod_2, out_mod_2, treat="lead", mediator="egfr", sims=1000)
+summary(med_2)
