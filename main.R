@@ -261,28 +261,7 @@ helio.plot(cohort_cc, lab.cex = .8, name.cex = .9,
            y.name = "Physical and Demographic \n Measurements", 
            main = "Biomarkers Vs. Physical and Demographic Measurements") 
 
-#prelim mediation analyses
-des <- svydesign(
-  id = ~ psu,
-  strata = ~ masked_var_psuedo_strat,
-  weights = ~ exam_weight,
-  nest = TRUE,
-  data = prelim_imp
-)
-
-#mediation analysis for death in general
-med_mod_1 <- svyglm(egfr ~ lead + age_at_screen + gender + race + family_pir + bmi, design = des)
-out_mod_1 <- svyglm(dead_2019 ~ lead + egfr + age_at_screen + gender + race + family_pir + bmi, family = quasibinomial(), design = des)
-med_1 <- mediate(med_mod_1, out_mod_1, treat="lead", mediator="egfr", sims=1000)
-summary(med_1)
-
-#mediation analysis for death where leading cause was kidney related
-med_mod_2 <- svyglm(egfr ~ lead + age_at_screen + gender + race + family_pir + bmi, design = des)
-out_mod_2 <- svyglm(death_renal ~ lead + egfr + age_at_screen + gender + race + family_pir + bmi, family = quasibinomial(), design = des)
-med_2 <- mediate(med_mod_2, out_mod_2, treat="lead", mediator="egfr", sims=1000)
-summary(med_2)
-
-#assess non-linearity
+#assess relationships and non-linearity
 p_lead_egfr <- ggplot(prelim_imp, aes(x = lead, y = egfr)) +
   geom_point(alpha = 0) + 
   stat_density_2d(aes(fill = ..density..),
@@ -328,11 +307,55 @@ p_bmi_egfr <- ggplot(prelim_imp, aes(x = bmi, y = egfr)) +
   theme(legend.position = "none")
 ggMarginal(p_bmi_egfr, type = "histogram", fill = "lightgrey", bins = 30)
 
-summary(glm(dead_2019 ~ lead, data = prelim_imp, family = binomial(link = "logit")))
-car::boxTidwell(as.numeric(prelim_imp$dead_2019) ~ prelim_imp$lead)
 ggplot(prelim_imp, aes(x = factor(dead_2019), y = lead)) +
   geom_violin(fill = "red", alpha = 0.7, color = "black") +
   theme_minimal() +
   theme(legend.position = "none") +
-  xlab("Dead in 2019") +
-  ylab("Age at Screen")
+  xlab("Dead in 2019")
+ggplot(prelim_imp, aes(x = factor(dead_2019), y = egfr)) +
+  geom_violin(fill = "red", alpha = 0.7, color = "black") +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  xlab("Dead in 2019")
+ggplot(prelim_imp, aes(x = factor(dead_2019), y = age_at_screen)) +
+  geom_violin(fill = "red", alpha = 0.7, color = "black") +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  xlab("Dead in 2019")
+ggplot(prelim_imp, aes(x = factor(dead_2019), y = family_pir)) +
+  geom_violin(fill = "red", alpha = 0.7, color = "black") +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  xlab("Dead in 2019")
+ggplot(prelim_imp, aes(x = factor(dead_2019), y = bmi)) +
+  geom_violin(fill = "red", alpha = 0.7, color = "black") +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  xlab("Dead in 2019")
+
+car::boxTidwell(as.numeric(prelim_imp$dead_2019) ~ prelim_imp$lead)
+car::boxTidwell(as.numeric(prelim_imp$dead_2019) ~ prelim_imp$egfr)
+car::boxTidwell(as.numeric(prelim_imp$dead_2019) ~ prelim_imp$age_at_screen)
+car::boxTidwell(as.numeric(prelim_imp$dead_2019) ~ as.numeric(prelim_imp$family_pir + .01))
+car::boxTidwell(as.numeric(prelim_imp$dead_2019) ~ prelim_imp$bmi)
+
+#prelim mediation analyses
+des <- svydesign(
+  id = ~ psu,
+  strata = ~ masked_var_psuedo_strat,
+  weights = ~ exam_weight,
+  nest = TRUE,
+  data = prelim_imp
+)
+
+#mediation analysis for death in general
+med_mod_1 <- svyglm(egfr ~ lead + age_at_screen + gender + race + family_pir + bmi, design = des)
+out_mod_1 <- svyglm(dead_2019 ~ lead + egfr + age_at_screen + gender + race + family_pir + bmi, family = quasibinomial(), design = des)
+med_1 <- mediate(med_mod_1, out_mod_1, treat="lead", mediator="egfr", sims=1000)
+summary(med_1)
+
+#mediation analysis for death where leading cause was kidney related
+med_mod_2 <- svyglm(egfr ~ lead + age_at_screen + gender + race + family_pir + bmi, design = des)
+out_mod_2 <- svyglm(death_renal ~ lead + egfr + age_at_screen + gender + race + family_pir + bmi, family = quasibinomial(), design = des)
+med_2 <- mediate(med_mod_2, out_mod_2, treat="lead", mediator="egfr", sims=1000)
+summary(med_2)
