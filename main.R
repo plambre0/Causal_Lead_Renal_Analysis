@@ -5,11 +5,18 @@ library(readr)
 library(dplyr)
 library(vcd)
 library(ggplot2)
+library(ggExtra)
 library(naniar)
 library(mice)
 library(FactoMineR)
 library(yacca)
-library(ltmle)
+library(survey)
+library(mediation)
+library(mgcv)
+#library(ltmle)
+library(tmle)
+library(SuperLearner)
+
 
 set.seed(1643)
 
@@ -274,3 +281,58 @@ med_mod_2 <- svyglm(egfr ~ lead + age_at_screen + gender + race + family_pir + b
 out_mod_2 <- svyglm(death_renal ~ lead + egfr + age_at_screen + gender + race + family_pir + bmi, family = quasibinomial(), design = des)
 med_2 <- mediate(med_mod_2, out_mod_2, treat="lead", mediator="egfr", sims=1000)
 summary(med_2)
+
+#assess non-linearity
+p_lead_egfr <- ggplot(prelim_imp, aes(x = lead, y = egfr)) +
+  geom_point(alpha = 0) + 
+  stat_density_2d(aes(fill = ..density..),
+                  geom = "raster",
+                  contour = FALSE) +
+  stat_density_2d(color = "black", size = 0.3) +
+  scale_fill_gradient(low = "white", high = "red") +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  coord_cartesian(xlim = c(0, 5))
+ggMarginal(p_lead_egfr, type = "histogram", fill = "lightgrey", bins = 30)
+
+p_age_egfr <- ggplot(prelim_imp, aes(x = age_at_screen, y = egfr)) +
+  geom_point(alpha = 0) + 
+  stat_density_2d(aes(fill = ..density..),
+                  geom = "raster",
+                  contour = FALSE) +
+  stat_density_2d(color = "black", size = 0.3) +
+  scale_fill_gradient(low = "white", high = "red") +
+  theme_minimal() +
+  theme(legend.position = "none")
+ggMarginal(p_age_egfr, type = "histogram", fill = "lightgrey", bins = 30)
+
+p_family_pir_egfr <- ggplot(prelim_imp, aes(x = family_pir, y = egfr)) +
+  geom_point(alpha = 0) + 
+  stat_density_2d(aes(fill = ..density..),
+                  geom = "raster",
+                  contour = FALSE) +
+  stat_density_2d(color = "black", size = 0.3) +
+  scale_fill_gradient(low = "white", high = "red") +
+  theme_minimal() +
+  theme(legend.position = "none")
+ggMarginal(p_family_pir_egfr, type = "histogram", fill = "lightgrey", bins = 30)
+
+p_bmi_egfr <- ggplot(prelim_imp, aes(x = bmi, y = egfr)) +
+  geom_point(alpha = 0) + 
+  stat_density_2d(aes(fill = ..density..),
+                  geom = "raster",
+                  contour = FALSE) +
+  stat_density_2d(color = "black", size = 0.3) +
+  scale_fill_gradient(low = "white", high = "red") +
+  theme_minimal() +
+  theme(legend.position = "none")
+ggMarginal(p_bmi_egfr, type = "histogram", fill = "lightgrey", bins = 30)
+
+summary(glm(dead_2019 ~ lead, data = prelim_imp, family = binomial(link = "logit")))
+car::boxTidwell(as.numeric(prelim_imp$dead_2019) ~ prelim_imp$lead)
+ggplot(prelim_imp, aes(x = factor(dead_2019), y = lead)) +
+  geom_violin(fill = "red", alpha = 0.7, color = "black") +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  xlab("Dead in 2019") +
+  ylab("Age at Screen")
