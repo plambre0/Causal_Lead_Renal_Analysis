@@ -1,5 +1,7 @@
 Conducted during 2025
 
+Analysis on the NHANES to evaluate evidence of associations for noncompliance to FDA regulations on lead exposure and legacy infrastructure and mortality across age groups.
+
 References:
 
 Centers for Disease Control and Prevention (CDC). National Center for Health Statistics (NCHS). (2007). National Health and Nutrition Examination Survey Data 2005-2006. Hyattsville, MD: U.S. Department of Health and Human Services, Centers for Disease Control and Prevention. https://wwwn.cdc.gov/nchs/nhanes/continuousnhanes/default.aspx?BeginYear=2005
