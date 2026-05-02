@@ -1,65 +1,53 @@
-library(dagitty)
-library(ggdag)
-library(haven)
-library(readr)
-library(dplyr)
-library(vcd)
-library(ggplot2)
-library(ggExtra)
-library(naniar)
-library(mice)
-library(FactoMineR)
-library(yacca)
-library(survey)
-library(mediation)
-library(mgcv)
-#library(ltmle)
-library(tmle)
-library(SuperLearner)
-
-
+################################################################################
+#Paolo Lambre, paololambre0@gmail.com, 2025 ####################################
+################################################################################
 set.seed(1643)
 
-#specify DAG for Causal Hypothesis
-#Lead Exposure -> Renal Damage -> Death
-dag <- dagitty("dag{Lead_Exposure -> Renal_Damage -> Death}")
-tidy_dagitty(dag)
-ggdag(dag, node = FALSE, text_col = "black", text_size = 3) + theme_dag_blank()
+library(readr)
+library(haven)
+library(dplyr)
+library(tidyr)
 
+################################################################################
+#Load Data #####################################################################
+################################################################################
+setwd("C:/Users/Paolo/Desktop/Personal Research/lead_kidneys/nhanes_data/")
 #Uses 2005-2006 NHANES Survey Data and 2019 Mortality Data
 #Albumin & Creatinine - Urine
-ALB_CR_D <- read_xpt("C:/Users/Paolo/Desktop/Personal Research/lead_kidneys/nhanes_data/ALB_CR_D.xpt")
-BIOPRO_D <- read_xpt("C:/Users/Paolo/Desktop/Personal Research/lead_kidneys/nhanes_data/BIOPRO_D.xpt")
+ALB_CR_D <- read_xpt("ALB_CR_D.xpt")
+BIOPRO_D <- read_xpt("BIOPRO_D.xpt")
 #Alcohol Use
-#ALQ_D <- read_xpt("C:/Users/Paolo/Desktop/Personal Research/lead_kidneys/nhanes_data/ALQ_D.xpt")
+#ALQ_D <- read_xpt("ALQ_D.xpt")
 #Body Measures
-BMX_D <- read_xpt("C:/Users/Paolo/Desktop/Personal Research/lead_kidneys/nhanes_data/BMX_D.xpt")
+BMX_D <- read_xpt("BMX_D.xpt")
 #Blood Pressure
-#BPX_D <- read_xpt("C:/Users/Paolo/Desktop/Personal Research/lead_kidneys/nhanes_data/BPX_D.xpt")
+BPX_D <- read_xpt("BPX_D.xpt")
+#Complete Blood Count
+CBC_D <- read_xpt("CBC_D.xpt")
 #C-Reactive Protein (CRP)
-CRP_D <- read_xpt("C:/Users/Paolo/Desktop/Personal Research/lead_kidneys/nhanes_data/CRP_D.xpt")
+CRP_D <- read_xpt("CRP_D.xpt")
 #Demographic Data
-DEMO_D <- read_xpt("C:/Users/Paolo/Desktop/Personal Research/lead_kidneys/nhanes_data/DEMO_D.xpt")
+DEMO_D <- read_xpt("DEMO_D.xpt")
 #Diabetes
-DIQ_D <- read_xpt("C:/Users/Paolo/Desktop/Personal Research/lead_kidneys/nhanes_data/DIQ_D.xpt")
+DIQ_D <- read_xpt("DIQ_D.xpt")
 #Mental Health - Depression Screener	
-DPQ_D <- read_xpt("C:/Users/Paolo/Desktop/Personal Research/lead_kidneys/nhanes_data/DPQ_D.xpt")
+DPQ_D <- read_xpt("DPQ_D.xpt")
 #Current Health Status
-HSQ_D <- read_xpt("C:/Users/Paolo/Desktop/Personal Research/lead_kidneys/nhanes_data/HSQ_D.xpt")
+HSQ_D <- read_xpt("HSQ_D.xpt")
 #Kidney Conditions - Urology	
-#KIQ_U_D <- read_xpt("C:/Users/Paolo/Desktop/Personal Research/lead_kidneys/nhanes_data/KIQ_U_D.xpt")
+#KIQ_U_D <- read_xpt("KIQ_U_D.xpt")
 #Medical Conditions	
-MCQ_D <- read_xpt("C:/Users/Paolo/Desktop/Personal Research/lead_kidneys/nhanes_data/MCQ_D.xpt")
+MCQ_D <- read_xpt("MCQ_D.xpt")
 #Physical Activity Monitor	
-#paxraw_d <- read_xpt("C:/Users/Paolo/Desktop/Personal Research/lead_kidneys/nhanes_data/paxraw_d.xpt")
+#paxraw_d <- read_xpt("paxraw_d.xpt")
 #Cadmium, Lead, & Total Mercury - Blood	
-PBCD_D <- read_xpt("C:/Users/Paolo/Desktop/Personal Research/lead_kidneys/nhanes_data/PBCD_D.xpt")
+PBCD_D <- read_xpt("PBCD_D.xpt")
 #Smoking - Recent Tobacco Use	
-SMQRTU_D <- read_xpt("C:/Users/Paolo/Desktop/Personal Research/lead_kidneys/nhanes_data/SMQRTU_D.xpt")
+SMQRTU_D <- read_xpt("SMQRTU_D.xpt")
 #Weight History
-#WHQ_D <- read_xpt("C:/Users/Paolo/Desktop/Personal Research/lead_kidneys/nhanes_data/WHQ_D.xpt")
+#WHQ_D <- read_xpt("WHQ_D.xpt")
 #Mortality Data 2019
-MORT <- read_fwf("C:/Users/Paolo/Desktop/Personal Research/lead_kidneys/nhanes_data/NHANES_2005_2006_MORT_2019_PUBLIC.dat",
+MORT <- read_fwf("NHANES_2005_2006_MORT_2019_PUBLIC.dat",
                  col_types = "ciiiiiiidd",
                  fwf_cols(publicid = c(1,14),
                           eligstat = c(15,15),
@@ -77,20 +65,23 @@ MORT <- read_fwf("C:/Users/Paolo/Desktop/Personal Research/lead_kidneys/nhanes_d
 names(MORT)[names(MORT) == "publicid"] <- "SEQN"
 MORT$SEQN <- as.double(MORT$SEQN)
 
-
-#assemble dataframe
+################################################################################
+#Clean Data ####################################################################
+################################################################################
 DF0 <- BIOPRO_D[, c("SEQN", "LBXSCR")]
 Df1 <- ALB_CR_D[, c("SEQN", "URXUMA", "URXUCR")]
 Df2 <- BMX_D[, c("SEQN", "BMXBMI", "BMXWAIST")]
 Df3 <- CRP_D[, c("SEQN", "LBXCRP")]
-Df4 <- DEMO_D[, c("SEQN", "RIDAGEYR", "RIAGENDR", "RIDRETH1", "INDFMPIR", "DMDEDUC2", "WTMEC2YR", "SDMVPSU", "SDMVSTRA")]
+Df4 <- DEMO_D[, c("SEQN", "RIDAGEYR", "RIAGENDR", "RIDRETH1", "INDFMPIR", 
+                  "DMDEDUC2", "WTMEC2YR", "SDMVPSU", "SDMVSTRA")]
 Df5 <- DIQ_D[, c("SEQN", "DIQ010", "DIQ160")]
 Df6 <- DPQ_D[, c("SEQN", "DPQ020")]
 Df7 <- HSQ_D[, c("SEQN", "HSD010")]
 Df8 <- MCQ_D[, c("SEQN", "MCQ220")]
 Df9 <- PBCD_D[, c("SEQN", "LBXBPB")]
 Df10 <- SMQRTU_D[, c("SEQN", "SMQ680")]
-Df11 <- MORT[, c("SEQN", "mortstat", "ucod_leading")]
+Df11 <- CBC_D[, c("SEQN", "LBXHGB")]
+Df12 <- MORT[, c("SEQN", "mortstat", "ucod_leading")]
 
 cohort <-
   DF0 %>% 
@@ -104,258 +95,447 @@ cohort <-
   full_join(Df8, by = "SEQN") %>% 
   full_join(Df9, by = "SEQN") %>% 
   full_join(Df10, by = "SEQN") %>%
-  full_join(Df11, by = "SEQN")
+  full_join(Df11, by = "SEQN") %>%
+  full_join(Df12, by = "SEQN")
 
-#rename for interpretability
-sapply(cohort, attributes)
-names(cohort) <- c("id", "creatinine_serum", "albumin_urine", "creatinine_urine", 
-                   "bmi", "waist_circ", "c-reactive_prot", "age_at_screen", 
-                   "gender", "race", "family_pir", "education_lev", 
-                   "exam_weight", "psu", "masked_var_psuedo_strat", "diabetes", 
-                   "prediabetes", "depression", "gen_health", "cancer", "lead", 
-                   "tobacco", "dead_2019", "death_cause")
-cohort$death_cause <- ifelse(is.na(cohort$death_cause), 0, cohort$death_cause)
-cohort$death_renal <- ifelse(cohort$death_cause == 9, 1, 0)
+cohort[, c("RIAGENDR", 
+           "RIDRETH1", 
+           "DMDEDUC2", 
+           "DIQ010", 
+           "DIQ160", 
+           "DPQ020", 
+           "HSD010", 
+           "MCQ220", 
+           "SMQ680", 
+           "mortstat",
+           "ucod_leading")] <- 
+  lapply(cohort[, c("RIAGENDR", 
+                    "RIDRETH1",
+                    "DMDEDUC2", 
+                    "DIQ010", 
+                    "DIQ160", 
+                    "DPQ020", 
+                    "HSD010", 
+                    "MCQ220", 
+                    "SMQ680", 
+                    "mortstat",
+                    "ucod_leading")], as.factor)
 
-#drop participants younger than 20
-cohort <- cohort[cohort$age_at_screen >= 20,]
-
-#initial missingness check
-vis_miss(cohort)
-miss_var_summary(cohort)
-mcar_test(cohort)
-
-cohort[, c("id", "gender", "race", "education_lev", "psu", "masked_var_psuedo_strat", 
-           "diabetes", "prediabetes", "depression", "gen_health", 
-           "cancer", "tobacco", "dead_2019", "death_cause", "death_renal")] <- 
-  lapply(cohort[, c("id", "gender", "race", "education_lev", "psu", 
-                    "masked_var_psuedo_strat", "diabetes", "prediabetes", 
-                    "depression", "gen_health", "cancer", "tobacco", "dead_2019",
-                    "death_cause", "death_renal")], 
-         as.factor)
-
-#recoding vars
-cohort$gender <- as.factor(ifelse(cohort$gender == 1, "Male", "Female"))
-race_labels <- c(
-  "1" = "Mexican_American",
-  "2" = "Other_Hispanic",
-  "3" = "Non_Hispanic_White",
-  "4" = "Non_Hispanic_Black",
-  "5" = "Other_Race"
-)
-cohort$race <- as.factor(race_labels[as.character(cohort$race)])
-diabetes_labels <- c(
-  "1" = "Yes",
-  "2" = "No",
-  "3" = "Pre-Diabetes",
-  "9" = "Doesn't_Know"
-)
-cohort$diabetes <- as.factor(diabetes_labels[as.character(cohort$diabetes)])
-cohort$education_lev <- factor(cohort$education_lev, 
-                               levels = c(1,2,3,4,5,7,9), 
-                               ordered = TRUE)
-gen_health_labels <- c(
-  "1" = "Excellent",
-  "2" = "Very good",
-  "3" = "Good",
-  "4" = "Fair",
-  "5" = "Poor",
-  "9" = "Doesn't_Know"
-)
-cohort$gen_health <- as.factor(gen_health_labels[as.character(cohort$gen_health)])
-cancer_labels <- c(
-  "1" = "Yes",
-  "2" = "No",
-  "9" = "Doesn't_Know"
-)
-cohort$cancer <- as.factor(cancer_labels[as.character(cohort$cancer)])
-tobacco_labels <- c(
-  "1" = "Yes",
-  "2" = "No",
-  "7" = "Refused"
-)
-cohort$tobacco <- as.factor(tobacco_labels[as.character(cohort$tobacco)])
-
-#compute egfr
 cohort <- cohort %>%
   mutate(
-    egfr = case_when(
-      gender == "Female" & creatinine_serum <= 0.7 ~ 144 * 
-        (creatinine_serum / 0.7) ^ (-0.329) * 
-        (0.993 ^ age_at_screen) * ifelse(race == "Non_Hispanic_Black", 1.159, 1),
-      gender == "Female" & creatinine_serum > 0.7 ~ 144 * 
-        (creatinine_serum / 0.7) ^ (-1.209) * 
-        (0.993^age_at_screen) * ifelse(race == "Non_Hispanic_Black", 1.159, 1),
-      gender == "Male" & creatinine_serum <= 0.9 ~ 141 * 
-        (creatinine_serum / 0.9) ^ (-0.411) * (0.993 ^ age_at_screen) * 
-        ifelse(race == "Non_Hispanic_Black", 1.159, 1),
-      gender == "Male" & creatinine_serum > 0.9 ~ 141 * 
-        (creatinine_serum / 0.9) ^ (-1.209) * (0.993 ^ age_at_screen) * 
-        ifelse(race == "Non_Hispanic_Black", 1.159, 1),
-      TRUE ~ NA_real_
-    )
+    kappa = ifelse(RIAGENDR == 2, 0.7, 0.9),
+    alpha = ifelse(RIAGENDR == 2, -0.241, -0.302),
+    sex_mult = ifelse(RIAGENDR == 2, 1.012, 1),
+    
+    egfr = 142 *
+      (pmin(LBXSCR / kappa, 1) ^ alpha) *
+      (pmax(LBXSCR / kappa, 1) ^ -1.200) *
+      (0.9938 ^ RIDAGEYR) *
+      sex_mult
+  ) %>%
+  select(-kappa, -alpha, -sex_mult)
+
+names(cohort) <- c(
+  "SEQN",
+  "serum_creatinine_mg_dl",      #LBXSCR
+  "urine_albumin_mg_l",          #URXUMA
+  "urine_creatinine_mg_dl",      #URXUCR
+  "bmi",                         #BMXBMI
+  "waist_circumference_cm",      #BMXWAIST
+  "c_reactive_protein_mg_l",     #LBXCRP
+  "age_years",                   #RIDAGEYR
+  "sex",                         #RIAGENDR
+  "race_ethnicity",              #RIDRETH1
+  "income_poverty_ratio",        #INDFMPIR
+  "education_level",             #DMDEDUC2
+  "exam_weight_2yr",             #WTMEC2YR
+  "psu",                         #SDMVPSU
+  "strata",                      #SDMVSTRA
+  "diabetes_dx",                 #DIQ010
+  "diabetes_insulin_use",        #DIQ160
+  "depression_score_phq2",       #DPQ020
+  "general_health_status",       #HSD010
+  "cancer_dx",                   #MCQ220
+  "blood_lead_ug_dl",            #LBXBPB
+  "smoking_recent",              #SMQ680
+  "hemoglobin_g_dl",             #LBXHGB
+  "mortality_status",            #mortstat
+  "leading_cause_of_death",      #ucod_leading
+  "egfr"                         #egfr
+)
+
+cohort <- as.data.frame(cohort)
+
+cohort <- cohort %>%
+  mutate(race_ethnicity = case_match(race_ethnicity,
+                                     "1" ~ "Mexican_American",
+                                     "2" ~ "Other_Hispanic",
+                                     "3" ~ "White",
+                                     "4" ~ "Black",
+                                     "5" ~ "Other",
+                                     .default = race_ethnicity
+  ))
+
+cohort$sex <- ifelse(cohort$sex == "1", "male", "female")
+
+cohort <- cohort %>%
+  mutate(diabetes_dx = case_match(diabetes_dx,
+                                  "1" ~ "Yes",
+                                  "2" ~ "No",
+                                  "3" ~ "Borderline",
+                                  "9" ~ "Unknown",
+                                  .default = diabetes_dx
+  ))
+cohort <- cohort %>%
+  mutate(diabetes_insulin_use = case_match(diabetes_insulin_use,
+                                           "1" ~ "Yes",
+                                           "2" ~ "No",
+                                           "9" ~ "Unknown",
+                                           .default = diabetes_insulin_use
+  ))
+cohort <- cohort %>%
+  mutate(cancer_dx = case_match(cancer_dx,
+                                "1" ~ "Yes",
+                                "2" ~ "No",
+                                "9" ~ "Unknown",
+                                .default = cancer_dx
+  ))
+cohort <- cohort %>%
+  mutate(smoking_recent = case_match(smoking_recent,
+                                     "1" ~ "Yes",
+                                     "2" ~ "No",
+                                     "7" ~ "Refused",
+                                     .default = smoking_recent
+  ))
+cohort <- cohort %>%
+  mutate(mortality_status = case_match(mortality_status,
+                                       "0" ~ "No",
+                                       "1" ~ "Yes",
+                                       .default = mortality_status))
+
+cohort[c("sex", "race_ethnicity", "diabetes_dx", "diabetes_insulin_use", 
+         "cancer_dx", "smoking_recent", "mortality_status", "psu")] <- 
+  lapply(cohort[c("sex", "race_ethnicity", "diabetes_dx", 
+                  "diabetes_insulin_use", "cancer_dx", "smoking_recent", 
+                  "mortality_status", "psu")], as.factor)
+
+################################################################################
+#Transformations, Missingness, & Imputation ####################################
+################################################################################
+library(naniar)
+library(VIM)
+
+naniar::vis_miss(cohort)
+cohort$SEQN <- NULL
+cohort$leading_cause_of_death <- NULL
+cohort_adult <- cohort[cohort$age_years>=18,]
+miss_pattern <- naniar::as_shadow_upset(cohort_adult)
+naniar::vis_miss(cohort_adult, cluster = TRUE)
+naniar::gg_miss_upset(cohort_adult)
+cohort_adult_t <- cohort
+cohort_adult_t[, c("serum_creatinine_mg_dl",
+                   "urine_albumin_mg_l",
+                   "urine_creatinine_mg_dl",
+                   "bmi")] <- 
+  sapply(cohort_adult_t[, c("serum_creatinine_mg_dl",
+                            "urine_albumin_mg_l",
+                            "urine_creatinine_mg_dl",
+                            "bmi")], log)
+cohort_adult_t_hd <- hotdeck(cohort_adult_t)
+cohort_adult_t_i <- cohort_adult_t_hd[, c(1:24)]
+cohort_adult_t_i
+
+################################################################################
+#Exploratory Analysis ##########################################################
+################################################################################
+library(psych)
+library(FactoMineR)
+library(yacca)
+library(rcompanion)
+
+numeric_vars <- c("serum_creatinine_mg_dl", "urine_albumin_mg_l", 
+                  "urine_creatinine_mg_dl", 
+                  "bmi", "waist_circumference_cm", "age_years", 
+                  "income_poverty_ratio", "c_reactive_protein_mg_l", 
+                  "egfr", "blood_lead_ug_dl", "hemoglobin_g_dl", 
+                  "exam_weight_2yr")
+cat_vars <- setdiff(names(cohort_adult_t_i), numeric_vars)
+describe(cohort_adult_t_i[, numeric_vars])
+summary(cohort_adult_t_i[, cat_vars])
+
+cohort_adult_t_i_pearson <- cor(cohort_adult_t_i[, numeric_vars], 
+                                method = "pearson")
+cohort_adult_t_i_kendall <- cor(cohort_adult_t_i[, numeric_vars], 
+                                method = "kendall")
+
+cohort_transf_mi <- cohort_adult_transf_mi
+
+cohort_adult_t_i <- cohort_adult_t_i %>% 
+  mutate(age_group = case_when(
+    age_years >= 28 ~ "Born_Pre-1978",
+    TRUE ~ "Born_1978-1988",
+  ))
+
+cohort_Born_Pre_1978 <- 
+  cohort_adult_t_i[cohort_adult_t_i$age_group == "Born_Pre-1978",]
+cohort_Born_1978_1988 <- 
+  cohort_adult_t_i[cohort_adult_t_i$age_group == "Born_1978-1988",]
+
+describe(cohort_Born_Pre_1978[, numeric_vars])
+summary(cohort_Born_Pre_1978[, cat_vars])
+describe(cohort_Born_1978_1988[, numeric_vars])
+summary(cohort_Born_Pre_1978[, cat_vars])
+
+cohort_adult_t_i_norm <- cohort_adult_t_i
+cohort_adult_t_i_norm[, numeric_vars[c(1:11)]] <- 
+  sapply(cohort_adult_t_i_norm[, numeric_vars[c(1:11)]], scale)
+
+cohort_adult_t_i_norm_famd <- FAMD(cohort_adult_t_i_norm)
+
+cohort_adult_t_i_norm_cca <- 
+  cca(as.matrix(cohort_adult_t_i_norm[, c("income_poverty_ratio",
+                                          "age_years", 
+                                          "waist_circumference_cm")]),
+      as.matrix(cohort_adult_t_i_norm[, c("serum_creatinine_mg_dl", 
+                                          "urine_albumin_mg_l", 
+                                          "urine_creatinine_mg_dl",
+                                          "blood_lead_ug_dl",
+                                          "hemoglobin_g_dl",
+                                          "egfr")]))
+yacca::helio.plot(cohort_adult_t_i_norm_cca, 
+                  x.name = "Social Determinants of Health",
+                  y.name = "Metabolic Health", lab.cex = .7, main = "")
+
+cohort_adult_t_i$elevated_lead <- cohort_adult_t_i$blood_lead_ug_dl>3.5
+
+table_lead_mortality_all <- table(cohort_adult_t_i$elevated_lead, 
+                                  cohort_adult_t_i$mortality_status)
+
+chisq.test(table(na.omit(cohort_adult_t_i[, c("mortality_status", 
+                                              "elevated_lead")])))
+mantelhaen.test(table(cohort_adult_t_i$mortality_status, 
+                      cohort_adult_t_i$blood_lead_ug_dl>3.5, 
+                      cohort_adult_t_i$age_years))
+mantelhaen.test(table(cohort_adult_t_i$mortality_status, 
+                      cohort_adult_t_i$blood_lead_ug_dl>3.5, 
+                      cohort_adult_t_i$race_ethnicity))
+mantelhaen.test(table(cohort_adult_t_i$mortality_status, 
+                      cohort_adult_t_i$blood_lead_ug_dl>3.5, 
+                      cohort_adult_t_i$sex))
+
+perc_test_med_lead_age <- percentileTest(blood_lead_ug_dl ~ age_group,
+                                         data = cohort_adult_t_i,
+                                         test = "median",
+                                         r    = 10000)
+perc_test_med_hem_age <- percentileTest(hemoglobin_g_dl ~ age_group,
+                                        data = cohort_adult_t_i,
+                                        test = "median",
+                                        r    = 10000)
+perc_test_med_egfr_age <- percentileTest(egfr ~ age_group,
+                                         data = cohort_adult_t_i,
+                                         test = "median",
+                                         r    = 10000)
+perc_test_mean_lead_age <- percentileTest(blood_lead_ug_dl ~ age_group,
+                                          data = cohort_adult_t_i,
+                                          test = "mean",
+                                          r    = 10000)
+perc_test_mean_hem_age <- percentileTest(hemoglobin_g_dl ~ age_group,
+                                         data = cohort_adult_t_i,
+                                         test = "mean",
+                                         r    = 10000)
+perc_test_mean_egfr_age <- percentileTest(egfr ~ age_group,
+                                          data = cohort_adult_t_i,
+                                          test = "mean",
+                                          r    = 10000)
+
+ks.test(cohort_adult_t_i[cohort_adult_t_i$age_group == "Born_Pre-1978", 
+                         c("blood_lead_ug_dl")],
+        cohort_adult_t_i[cohort_adult_t_i$age_group == "Born_1978-1988", 
+                         c("blood_lead_ug_dl")])
+ks.test(cohort_adult_t_i[cohort_adult_t_i$age_group == "Born_Pre-1978", 
+                         c("hemoglobin_g_dl")],
+        cohort_adult_t_i[cohort_adult_t_i$age_group == "Born_1978-1988", 
+                         c("hemoglobin_g_dl")])
+ks.test(cohort_adult_t_i[cohort_adult_t_i$age_group == "Born_Pre-1978", 
+                         c("egfr")],
+        cohort_adult_t_i[cohort_adult_t_i$age_group == "Born_1978-1988", 
+                         c("egfr")])
+################################################################################
+#Visualizations#################################################################
+################################################################################
+library(ggplot2)
+library(pheatmap)
+library(car)
+library(vioplot)
+library(vcd)
+
+cohort_adult %>%
+  select(serum_creatinine_mg_dl,
+         urine_albumin_mg_l,
+         urine_creatinine_mg_dl,
+         bmi,
+         waist_circumference_cm,
+         age_years,
+         income_poverty_ratio,
+         egfr,
+         blood_lead_ug_dl,
+         hemoglobin_g_dl) %>%
+  pivot_longer(everything()) %>%
+  ggplot(aes(value)) +
+  geom_histogram(bins = 100) +
+  facet_wrap(~name, scales = "free")
+
+pheatmap(cohort_adult_t_i_pearson)
+pheatmap(cohort_adult_t_i_kendall)
+
+vioplot(blood_lead_ug_dl ~ age_group, data = cohort_adult_t_i,
+        xlab = "Age Group", ylab = "Blood Lead ug/dl")
+vioplot(hemoglobin_g_dl ~ age_group, data = cohort_adult_t_i,
+        xlab = "Age Group", ylab = "Hemoglobin g/dl")
+vioplot(egfr ~ age_group, data = cohort_adult_t_i,
+        xlab = "Age Group", ylab = "eGFR")
+
+scatterplot(cohort_adult_t_i$income_poverty_ratio, 
+            cohort_adult_t_i$hemoglobin_g_dl, 
+            smooth = FALSE,
+            regLine = FALSE,
+            xlab = "Income Poverty Ratio",
+            ylab = "Hemoglobin g/dl")
+scatterplot(cohort_adult_t_i$age_years, 
+            cohort_adult_t_i$blood_lead_ug_dl, 
+            smooth = FALSE,
+            regLine = FALSE,
+            xlab = "Age",
+            ylab = "Blood Lead ug/dl")
+scatterplot(cohort_adult_t_i$income_poverty_ratio,
+            cohort_adult_t_i$blood_lead_ug_dl, 
+            smooth = FALSE,
+            regLine = FALSE,
+            xlab = "Income Poverty Ratio",
+            ylab = "Blood Lead ug/dl")
+scatterplot(cohort_adult_t_i$blood_lead_ug_dl, 
+            cohort_adult_t_i$hemoglobin_g_dl, 
+            smooth = FALSE,
+            regLine = FALSE,
+            xlab = "Blood Lead ug/dl",
+            ylab = "Hemoglobin g/dl")
+scatterplot(cohort_adult_t_i$blood_lead_ug_dl,
+            cohort_adult_t_i$income_poverty_ratio, 
+            smooth = FALSE,
+            regLine = FALSE,
+            xlab = "Blood Lead ug/dl",
+            ylab = "Income Poverty Ratio")
+scatterplot(cohort_adult_t_i$income_poverty_ratio, 
+            cohort_adult_t_i$egfr,
+            smooth = FALSE,
+            regLine = FALSE,
+            xlab = "Income Poverty Ratio",
+            ylab = "eGFR")
+
+mosaic(table(na.omit(cohort_adult_t_i[, c("mortality_status", 
+                                          "elevated_lead")])),
+       shade = TRUE, 
+       main = "Mortality Status by Elevated Blood Lead (ug/dl)>3.5")
+
+################################################################################
+#Preliminary Regression Analysis ###############################################
+################################################################################
+#Initial Univariate Models######################################################
+model_blood_lead <- glm(blood_lead_ug_dl ~ age_group, 
+                        data = cohort_adult_t_i,
+                        family = inverse.gaussian(link = "inverse"))
+summary(model_blood_lead)
+plot(model_blood_lead)
+
+model_hemoglobin <- glm(hemoglobin_g_dl ~ age_group, 
+                        data = cohort_adult_t_i)
+summary(model_blood_lead)
+plot(model_blood_lead)
+
+model_death <- glm(mortality_status ~ blood_lead_ug_dl, 
+                   data = cohort_adult_t_i,
+                   family = binomial(link = "logit"))
+summary(model_death)
+plot(model_death)
+#Initial Covariate Controlled Models############################################
+model_blood_lead_cov <- glm(blood_lead_ug_dl ~ age_group + 
+                              income_poverty_ratio + smoking_recent + 
+                              waist_circumference_cm + diabetes_dx + 
+                              race_ethnicity + sex, 
+                            data = cohort_adult_t_i,
+                            family = inverse.gaussian(link = "inverse"))
+summary(model_blood_lead_cov)
+plot(model_blood_lead_cov)
+
+model_hemoglobin_cov <- glm(hemoglobin_g_dl ~ blood_lead_ug_dl * age_group + 
+                              income_poverty_ratio + smoking_recent + 
+                              waist_circumference_cm + diabetes_dx + 
+                              race_ethnicity + sex, 
+                            data = cohort_adult_t_i)
+summary(model_hemoglobin_cov)
+plot(model_hemoglobin_cov)
+
+model_death_cov <- glm(mortality_status ~ blood_lead_ug_dl + age_group + 
+                         income_poverty_ratio + smoking_recent + 
+                         waist_circumference_cm + diabetes_dx + 
+                         race_ethnicity + sex, 
+                       data = cohort_adult_t_i,
+                       family = binomial(link = "logit"))
+summary(model_death_cov)
+plot(model_death_cov)
+################################################################################
+#Survey Weighed Regression Analysis ############################################
+################################################################################
+library(survey)
+
+design <- svydesign(
+  ids    = ~psu,
+  strata = ~strata,
+  weights = ~exam_weight_2yr,
+  data   = cohort_adult_t_i,
+  nest   = TRUE
+)
+#Univariate Models##############################################################
+model_blood_lead_surv <- svyglm(blood_lead_ug_dl ~ age_group, 
+                                family = inverse.gaussian(link = "inverse"),
+                                design = design,
+)
+summary(model_blood_lead_surv)
+
+model_hemoglobin_surv <- svyglm(hemoglobin_g_dl ~ age_group, 
+         design = design, 
+         family = inverse.gaussian(link = "inverse")
   )
+summary(model_hemoglobin_surv)
 
-#code lead poisoning
-cohort$lead_poisoning <- as.factor(ifelse(cohort$lead > 3.5, 1, 0))
-cohort$renal_damage <- as.factor(ifelse(cohort$egfr < 60, 1, 0))
+model_death_cov_surv <- svyglm(mortality_status ~ blood_lead_ug_dl, 
+                               design = design,
+                               family = binomial(link = "logit"))
+summary(model_death_cov_surv)
 
-#use first MICE imputation for exploratory analysis
-cohort_imp_quickpred <- quickpred(cohort, mincor = .2)
-censor <- c(
-  "id", "dead_2019", "lead_poisoning", "egfr", "masked_var_psuedo_strat", 
-  "SDMVPSU", "SDMVSTRA", "WTMEC2YR", "WTINT2YR"
-)
-censor <- intersect(censor, colnames(cohort_imp_quickpred))
-cohort_imp_quickpred[, censor] <- 0
-cohort_prelim_imp <- mice(cohort, m = 1, pred = cohort_imp_quickpred)
-prelim_imp <- complete(cohort_prelim_imp)
+#Covariate Controlled Models####################################################
 
-#exploratory analysis
-summary(cohort)
+model_blood_lead_cov_surv <- svyglm(blood_lead_ug_dl ~ 
+                                      age_group + income_poverty_ratio + 
+                                      smoking_recent + waist_circumference_cm + 
+                                      diabetes_dx + race_ethnicity + sex, 
+         design = design,
+         family = inverse.gaussian(link = "inverse"))
+summary(model_blood_lead_cov_surv)
 
-hist(cohort$creatinine_serum, breaks = 100)
-hist(cohort$albumin_urine, breaks = 100)
-hist(cohort$creatinine_urine, breaks = 100)
-hist(cohort$waist_circ, breaks = 100)
-hist(cohort$`c-reactive_prot`, breaks = 100)
-hist(cohort$age_at_screen, breaks = 100)
-hist(cohort$family_pir, breaks = 100)
-hist(cohort$egfr, breaks = 100)
+model_hemoglobin_cov_surv <- svyglm(hemoglobin_g_dl ~ 
+                                      blood_lead_ug_dl * age_group + 
+                                      income_poverty_ratio + smoking_recent + 
+                                      waist_circumference_cm + diabetes_dx + sex, 
+                                    design = design, 
+                                    family = inverse.gaussian(link = "inverse"))
+summary(model_hemoglobin_cov_surv)
 
-hist(prelim_imp$creatinine_serum, breaks = 100)
-hist(prelim_imp$albumin_urine, breaks = 100)
-hist(prelim_imp$creatinine_urine, breaks = 100)
-hist(prelim_imp$waist_circ, breaks = 100)
-hist(prelim_imp$`c-reactive_prot`, breaks = 100)
-hist(prelim_imp$age_at_screen, breaks = 100)
-hist(prelim_imp$family_pir, breaks = 100)
-hist(prelim_imp$egfr, breaks = 100)
-
-#preliminary chi-square tests
-vcd::mosaic(renal_damage ~ lead_poisoning, data = prelim_imp)
-chisq.test(table(prelim_imp$renal_damage, prelim_imp$lead_poisoning))
-
-vcd::mosaic(dead_2019 ~ renal_damage, data = prelim_imp)
-chisq.test(table(prelim_imp$dead_2019, prelim_imp$renal_damage))
-
-vcd::mosaic(dead_2019 ~ lead_poisoning, data = prelim_imp)
-chisq.test(table(prelim_imp$dead_2019, prelim_imp$lead_poisoning))
-
-#Multiple Correspondence Analysis
-cohort_mca <- MCA(prelim_imp[, c("gender", "race", "education_lev", "diabetes", 
-                                 "depression", "gen_health", "cancer", "tobacco", 
-                                 "dead_2019")])
-
-#Canonical Correlation Analysis
-cohort_cc <- cca(as.matrix(prelim_imp[, c("albumin_urine", 
-                                          "creatinine_urine", 
-                                          "egfr", 
-                                          "c-reactive_prot")]), 
-                        as.matrix(prelim_imp[, c("bmi", 
-                                                 "waist_circ", 
-                                                 "age_at_screen", 
-                                                 "family_pir")]))
-helio.plot(cohort_cc, lab.cex = .8, name.cex = .9, 
-           x.name = "Biomarkers", 
-           y.name = "Physical and Demographic \n Measurements", 
-           main = "Biomarkers Vs. Physical and Demographic Measurements") 
-
-#assess relationships and non-linearity
-p_lead_egfr <- ggplot(prelim_imp, aes(x = lead, y = egfr)) +
-  geom_point(alpha = 0) + 
-  stat_density_2d(aes(fill = ..density..),
-                  geom = "raster",
-                  contour = FALSE) +
-  stat_density_2d(color = "black", size = 0.3) +
-  scale_fill_gradient(low = "white", high = "red") +
-  theme_minimal() +
-  theme(legend.position = "none") +
-  coord_cartesian(xlim = c(0, 5))
-ggMarginal(p_lead_egfr, type = "histogram", fill = "lightgrey", bins = 30)
-
-p_age_egfr <- ggplot(prelim_imp, aes(x = age_at_screen, y = egfr)) +
-  geom_point(alpha = 0) + 
-  stat_density_2d(aes(fill = ..density..),
-                  geom = "raster",
-                  contour = FALSE) +
-  stat_density_2d(color = "black", size = 0.3) +
-  scale_fill_gradient(low = "white", high = "red") +
-  theme_minimal() +
-  theme(legend.position = "none")
-ggMarginal(p_age_egfr, type = "histogram", fill = "lightgrey", bins = 30)
-
-p_family_pir_egfr <- ggplot(prelim_imp, aes(x = family_pir, y = egfr)) +
-  geom_point(alpha = 0) + 
-  stat_density_2d(aes(fill = ..density..),
-                  geom = "raster",
-                  contour = FALSE) +
-  stat_density_2d(color = "black", size = 0.3) +
-  scale_fill_gradient(low = "white", high = "red") +
-  theme_minimal() +
-  theme(legend.position = "none")
-ggMarginal(p_family_pir_egfr, type = "histogram", fill = "lightgrey", bins = 30)
-
-p_bmi_egfr <- ggplot(prelim_imp, aes(x = bmi, y = egfr)) +
-  geom_point(alpha = 0) + 
-  stat_density_2d(aes(fill = ..density..),
-                  geom = "raster",
-                  contour = FALSE) +
-  stat_density_2d(color = "black", size = 0.3) +
-  scale_fill_gradient(low = "white", high = "red") +
-  theme_minimal() +
-  theme(legend.position = "none")
-ggMarginal(p_bmi_egfr, type = "histogram", fill = "lightgrey", bins = 30)
-
-ggplot(prelim_imp, aes(x = factor(dead_2019), y = lead)) +
-  geom_violin(fill = "red", alpha = 0.7, color = "black") +
-  theme_minimal() +
-  theme(legend.position = "none") +
-  xlab("Dead in 2019")
-ggplot(prelim_imp, aes(x = factor(dead_2019), y = egfr)) +
-  geom_violin(fill = "red", alpha = 0.7, color = "black") +
-  theme_minimal() +
-  theme(legend.position = "none") +
-  xlab("Dead in 2019")
-ggplot(prelim_imp, aes(x = factor(dead_2019), y = age_at_screen)) +
-  geom_violin(fill = "red", alpha = 0.7, color = "black") +
-  theme_minimal() +
-  theme(legend.position = "none") +
-  xlab("Dead in 2019")
-ggplot(prelim_imp, aes(x = factor(dead_2019), y = family_pir)) +
-  geom_violin(fill = "red", alpha = 0.7, color = "black") +
-  theme_minimal() +
-  theme(legend.position = "none") +
-  xlab("Dead in 2019")
-ggplot(prelim_imp, aes(x = factor(dead_2019), y = bmi)) +
-  geom_violin(fill = "red", alpha = 0.7, color = "black") +
-  theme_minimal() +
-  theme(legend.position = "none") +
-  xlab("Dead in 2019")
-
-car::boxTidwell(as.numeric(prelim_imp$dead_2019) ~ prelim_imp$lead)
-car::boxTidwell(as.numeric(prelim_imp$dead_2019) ~ prelim_imp$egfr)
-car::boxTidwell(as.numeric(prelim_imp$dead_2019) ~ prelim_imp$age_at_screen)
-car::boxTidwell(as.numeric(prelim_imp$dead_2019) ~ as.numeric(prelim_imp$family_pir + .01))
-car::boxTidwell(as.numeric(prelim_imp$dead_2019) ~ prelim_imp$bmi)
-
-#prelim mediation analyses
-des <- svydesign(
-  id = ~ psu,
-  strata = ~ masked_var_psuedo_strat,
-  weights = ~ exam_weight,
-  nest = TRUE,
-  data = prelim_imp
-)
-
-#mediation analysis for death in general
-med_mod_1 <- svyglm(egfr ~ lead + age_at_screen + gender + race + family_pir + bmi, design = des)
-out_mod_1 <- svyglm(dead_2019 ~ lead + egfr + age_at_screen + gender + race + family_pir + bmi, family = quasibinomial(), design = des)
-med_1 <- mediate(med_mod_1, out_mod_1, treat="lead", mediator="egfr", sims=1000)
-summary(med_1)
-
-#mediation analysis for death where leading cause was kidney related
-med_mod_2 <- svyglm(egfr ~ lead + age_at_screen + gender + race + family_pir + bmi, design = des)
-out_mod_2 <- svyglm(death_renal ~ lead + egfr + age_at_screen + gender + race + family_pir + bmi, family = quasibinomial(), design = des)
-med_2 <- mediate(med_mod_2, out_mod_2, treat="lead", mediator="egfr", sims=1000)
-summary(med_2)
+model_death_cov_surv <- svyglm(mortality_status ~ 
+                                 blood_lead_ug_dl + age_group + 
+                                 income_poverty_ratio + smoking_recent + 
+                                 waist_circumference_cm + diabetes_dx + 
+                                 race_ethnicity + sex, 
+                               design = design,
+                               family = binomial(link = "logit"))
+summary(model_death_cov_surv)
