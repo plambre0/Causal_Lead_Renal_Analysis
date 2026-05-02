@@ -1,4 +1,4 @@
-Conducted during 2025
+Done during 2025
 
 Description:
 Analysis on the NHANES to evaluate evidence of associations for noncompliance to FDA regulations on lead exposure and legacy infrastructure and mortality across age groups.
