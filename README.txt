@@ -1,6 +1,10 @@
 Conducted during 2025
 
+Description:
 Analysis on the NHANES to evaluate evidence of associations for noncompliance to FDA regulations on lead exposure and legacy infrastructure and mortality across age groups.
+
+Results:
+Based on the results of this analysis, there is evidence to warrant further investigation that either old infrastructure or regulations noncompliance may have significantly contributed to mortality rates in older individuals, which could be a result of residing in living spaces which did not comply with initial lead paint or pipe bans. Adults showing high correlations with elevated blood lead concentrations measured between 2005-2006 had disproportionate mortality rates in the 2019 follow up regardless of their age. It is noteworthy that these results were consistent across socioeconomics groups which indicate that there is no clear evidence of these significantly being the result of environmental and municipal injustices which implies these effects could be due to widespread neglect.
 
 References:
 
